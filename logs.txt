@@ -1,0 +1,49 @@
+2025-11-09 23:36:34  INFO: Stopping server...
+2025-11-09 23:36:40  INFO: Operating system name: Windows 11 version: 10.0 architecture: amd64
+2025-11-09 23:36:40  INFO: Java runtime name: OpenJDK 64-Bit Server VM vendor: Eclipse Adoptium version: 21.0.7+6-LTS
+2025-11-09 23:36:40  INFO: Memory limit heap: 1976mb non-heap: 0mb
+2025-11-09 23:36:40  INFO: Character encoding: UTF-8
+2025-11-09 23:36:40  INFO: Version: 6.10.0
+2025-11-09 23:36:40  INFO: Starting server...
+2025-11-09 23:36:40  INFO: HikariPool-1 - Starting...
+2025-11-09 23:36:40  INFO: HikariPool-1 - Added connection conn0: url=jdbc:h2:./data/database user=SA
+2025-11-09 23:36:40  INFO: HikariPool-1 - Start completed.
+2025-11-09 23:36:40  INFO: Set default schema name to PUBLIC
+2025-11-09 23:36:40  INFO: Successfully acquired change log lock
+2025-11-09 23:36:41  INFO: Clearing database change log checksums for database h2
+2025-11-09 23:36:41  INFO: Successfully released change log lock
+2025-11-09 23:36:41  INFO: Command execution complete
+2025-11-09 23:36:41  INFO: Reading from PUBLIC.DATABASECHANGELOG
+2025-11-09 23:36:41  INFO: Reading from PUBLIC.DATABASECHANGELOG
+2025-11-09 23:36:41  INFO: Reading from PUBLIC.DATABASECHANGELOG
+2025-11-09 23:36:41  INFO: UPDATE SUMMARY
+2025-11-09 23:36:41  INFO: Run:                          0
+2025-11-09 23:36:41  INFO: Previously run:              28
+2025-11-09 23:36:41  INFO: Filtered out:                 0
+2025-11-09 23:36:41  INFO: -------------------------------
+2025-11-09 23:36:41  INFO: Total change sets:           28
+2025-11-09 23:36:41  INFO: Update summary generated
+2025-11-09 23:36:41  INFO: Command execution complete
+2025-11-09 23:36:44  WARN: Port disabled due to conflict - Address already in use: bind - BindException (...)
+2025-11-09 23:36:44  INFO: jetty-12.1.1; built: 2025-09-08T04:29:45.457Z; git: b7068950f9afa5f1df80e46053eda1d982895b03; jvm 21.0.7+6-LTS
+2025-11-09 23:36:44  INFO: Session workerName=node0
+2025-11-09 23:36:44  INFO: Started oeje10s.ServletContextHandler@3a1ac0fd{ROOT,/,b=file:///C:/Program%20Files/Traccar/web/,a=AVAILABLE,h=oeje10s.SessionHandler@4ba5702b{STARTED}}
+2025-11-09 23:36:46  INFO: Started oeje10s.ServletContextHandler@3a1ac0fd{ROOT,/,b=file:///C:/Program%20Files/Traccar/web/,a=AVAILABLE,h=oeje10s.SessionHandler@4ba5702b{STARTED}}
+2025-11-09 23:36:46  INFO: Started oejs.ServerConnector@29bd991a{HTTP/1.1, (http/1.1)}{0.0.0.0:8082}
+2025-11-09 23:36:46  INFO: Started oejs.Server@5cd7c65d{STARTING}[12.1.1,sto=0] @7586ms
+2025-11-09 23:37:04  INFO: login failed from: [0:0:0:0:0:0:0:1]
+2025-11-09 23:37:09  INFO: login failed from: [0:0:0:0:0:0:0:1]
+2025-11-09 23:37:15  INFO: login failed from: [0:0:0:0:0:0:0:1]
+2025-11-09 23:37:31  INFO: Email sent
+To: alissonrodrigues.st@gmail.com
+Subject: Password reset
+Attachment: null
+Body:
+<!DOCTYPE html>
+<html>
+<body>
+To reset password please click on the following link:<br>
+<a href="http://192.168.100.75:8082/reset-password?passwordReset=RzBFAiEA9fMgdWlHrYhdmwfI_u_h56XwnXtg7pqa8AVCs7wRzDoCIH-dAB9isv4BkJsc2mZNF34rxbCrPhS-NoaY4Onx3OJBeyJ1IjoxLCJlIjoiMjAyNS0xMS0xN1QwNTozNzozMS42MTMrMDA6MDAifQ">http://192.168.100.75:8082/reset-password?passwordReset=RzBFAiEA9fMgdWlHrYhdmwfI_u_h56XwnXtg7pqa8AVCs7wRzDoCIH-dAB9isv4BkJsc2mZNF34rxbCrPhS-NoaY4Onx3OJBeyJ1IjoxLCJlIjoiMjAyNS0xMS0xN1QwNTozNzozMS42MTMrMDA6MDAifQ</a><br>
+</body>
+</html>
+

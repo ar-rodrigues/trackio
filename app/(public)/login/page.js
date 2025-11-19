@@ -81,6 +81,8 @@ export default function LoginPage() {
     const formDataObj = new FormData();
     formDataObj.append("email", values.email);
     formDataObj.append("password", values.password);
+    formDataObj.append("firstName", values.firstName || "");
+    formDataObj.append("lastName", values.lastName || "");
 
     startTransition(async () => {
       try {
@@ -175,6 +177,24 @@ export default function LoginPage() {
           layout="vertical"
           requiredMark={false}
         >
+          <Form.Item
+            name="firstName"
+            rules={[
+              { required: true, message: "Por favor ingresa tu nombre" },
+            ]}
+          >
+            <Input prefixIcon={<RiUserLine />} placeholder="Nombre" />
+          </Form.Item>
+
+          <Form.Item
+            name="lastName"
+            rules={[
+              { required: true, message: "Por favor ingresa tu apellido" },
+            ]}
+          >
+            <Input prefixIcon={<RiUserLine />} placeholder="Apellido" />
+          </Form.Item>
+
           <Form.Item
             name="email"
             rules={[

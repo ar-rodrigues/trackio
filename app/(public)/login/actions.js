@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/utils/supabase/server";
+import { registerTraccarUser, refreshTraccarSession } from "@/utils/traccar/server";
+import { sendWelcomeEmail } from "@/utils/mailer/mailer";
 
 export async function login(formData) {
   const supabase = await createClient();
@@ -15,7 +17,7 @@ export async function login(formData) {
     password: formData.get("password"),
   };
 
-  const { error } = await supabase.auth.signInWithPassword(data);
+  const { data: signInData, error } = await supabase.auth.signInWithPassword(data);
 
   if (error) {
     // Return error object instead of throwing
@@ -24,6 +26,67 @@ export async function login(formData) {
       error: true,
       message: getErrorMessage(error.message),
     };
+  }
+
+  // After successful Supabase login, MANDATORY: Create/refresh Traccar session
+  // User MUST have a valid Traccar session to be allowed to login
+  if (signInData?.user) {
+    try {
+      // Wait a bit for the profile to be available
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Get user profile
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", signInData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error("[Login] Profile not found for user:", signInData.user.id);
+        // Sign out the user since we can't proceed without a profile
+        await supabase.auth.signOut();
+        return {
+          error: true,
+          message: "Error: Perfil de usuario no encontrado. Por favor, contacta al administrador.",
+        };
+      }
+
+      // MANDATORY: Create/refresh Traccar session - this will create the record if it doesn't exist
+      // This will fail if user doesn't exist in Traccar or credentials are wrong
+      const refreshResult = await refreshTraccarSession(
+        data.email,
+        data.password,
+        profile.id
+      );
+      
+      if (!refreshResult.success) {
+        console.error("[Login] Failed to create/refresh Traccar session:", refreshResult.error);
+        // Sign out the user since Traccar session creation failed
+        await supabase.auth.signOut();
+        
+        // Provide specific error messages based on the error
+        if (refreshResult.error?.includes("Credenciales inválidas") || refreshResult.error?.includes("401")) {
+          return {
+            error: true,
+            message: "Credenciales inválidas para Traccar. Por favor, verifica tu email y contraseña.",
+          };
+        }
+        
+        return {
+          error: true,
+          message: refreshResult.error || "No se pudo crear la sesión en Traccar. Por favor, verifica tus credenciales o contacta al administrador.",
+        };
+      }
+    } catch (traccarError) {
+      console.error("[Login] Unexpected error during Traccar session creation:", traccarError);
+      // Sign out the user since we can't create a Traccar session
+      await supabase.auth.signOut();
+      return {
+        error: true,
+        message: "Error al crear la sesión en Traccar. Por favor, intenta nuevamente o contacta al administrador.",
+      };
+    }
   }
 
   revalidatePath("/", "layout");
@@ -59,33 +122,146 @@ function getErrorMessage(errorMessage) {
 export async function signup(formData) {
   const supabase = await createClient();
 
-  // type-casting here for convenience
-  // in practice, you should validate your inputs
+  // Get form data
+  const email = formData.get("email");
+  const password = formData.get("password");
+  const firstName = formData.get("firstName") || "";
+  const lastName = formData.get("lastName") || "";
+  const name = `${firstName} ${lastName}`.trim() || email?.split("@")[0] || "Usuario"; // Use full name or email prefix as name
+
+  // Validate inputs
+  if (!email || !password || !firstName || !lastName) {
+    return {
+      error: true,
+      message: "Por favor, completa todos los campos requeridos.",
+    };
+  }
+
+  // STEP 1: Register user in Traccar FIRST (before Supabase signup)
+  // This ensures we don't create a Supabase user if Traccar registration fails
+  const traccarResult = await registerTraccarUser({
+    name,
+    firstName,
+    lastName,
+    email,
+    password,
+  });
+
+  if (!traccarResult.success) {
+    // Traccar registration failed - return error and don't proceed with Supabase signup
+    return {
+      error: true,
+      message: traccarResult.error || "Error al registrar el usuario en Traccar.",
+    };
+  }
+
+  // STEP 2: Only proceed with Supabase signup if Traccar registration succeeded
   const data = {
-    email: formData.get("email"),
-    password: formData.get("password"),
+    email,
+    password,
     options: {
       emailRedirectTo: `/auth/confirm?next=/private`,
+      data: {
+        traccar_user_id: traccarResult.data?.traccarUser?.id,
+        traccar_token: traccarResult.data?.token,
+      },
     },
   };
 
-  const { error } = await supabase.auth.signUp(data);
+  const { data: signupData, error } = await supabase.auth.signUp(data);
 
   if (error) {
-    // Return error object instead of throwing
-    // This allows the client to handle the error gracefully
+    // Supabase signup failed - but user was already created in Traccar
+    // This is a problem, but we'll return the error
+    // In production, you might want to delete the Traccar user here
+    console.error(
+      "Supabase signup failed after Traccar registration:",
+      error
+    );
     return {
       error: true,
       message: getSignupErrorMessage(error.message),
     };
   }
 
-  // For signup, we might want to show a success message
-  // and redirect to a confirmation page or back to login
-  revalidatePath("/", "layout");
+  // STEP 3: Save Traccar user mapping to database and update profile
+  // Get the created user's profile
+  if (signupData?.user) {
+    try {
+      // Wait a bit for the profile to be created by trigger
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-  // Redirect to login with success message
-  redirect("/login?message=signup_success");
+      // Get user profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", signupData.user.id)
+        .single();
+
+      if (profile) {
+        // Update profile with first_name and last_name
+        await supabase
+          .from("profiles")
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+          })
+          .eq("id", profile.id);
+
+        // Save Traccar user mapping
+        if (traccarResult.data?.traccarUser) {
+          const sessionToken = traccarResult.data.token;
+          
+          // Only save token if we have one, otherwise save without token (user will need to login)
+          const traccarUserData = {
+            profile_id: profile.id,
+            traccar_user_id: traccarResult.data.traccarUser.id,
+            traccar_username: traccarResult.data.traccarUser.email || email,
+            is_synced: true,
+            last_sync_at: new Date().toISOString(),
+          };
+
+          // If we have a token, add it with expiration
+          if (sessionToken) {
+            const tokenExpiresAt = new Date();
+            tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 7);
+            traccarUserData.session_token = sessionToken;
+            traccarUserData.token_expires_at = tokenExpiresAt.toISOString();
+          } else {
+            console.warn(
+              `Usuario ${email} registrado en Traccar pero no se obtuvo token de sesión. El usuario necesitará iniciar sesión en Traccar.`
+            );
+          }
+
+          await supabase.from("traccar_users").insert(traccarUserData);
+        }
+      }
+    } catch (dbError) {
+      console.error(
+        "Error saving user data to database:",
+        dbError
+      );
+      // Don't fail signup if DB mapping fails - it can be fixed later
+    }
+  }
+
+  // STEP 4: Send welcome email
+  try {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.NEXT_PUBLIC_VERCEL_URL
+        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        : "http://localhost:3000");
+
+    await sendWelcomeEmail(email, name, password, baseUrl);
+  } catch (emailError) {
+    console.error("Error sending welcome email:", emailError);
+    // Don't fail signup if email fails - it's not critical
+  }
+
+  // STEP 5: Revalidate and redirect to private route
+  revalidatePath("/", "layout");
+  redirect("/private");
 }
 
 /**

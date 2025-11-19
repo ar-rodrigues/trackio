@@ -5,6 +5,8 @@ import {
   RiTeamLine,
   RiUserLine,
   RiDashboardLine,
+  RiMapPinLine,
+  RiDeviceLine,
 } from "react-icons/ri";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -22,6 +24,8 @@ const iconMap = {
   RiRocketLine: RiRocketLine,
   RiTeamLine: RiTeamLine,
   RiUserLine: RiUserLine,
+  RiMapPinLine: RiMapPinLine,
+  RiDeviceLine: RiDeviceLine,
 };
 
 export default function PrivateLayout({ children }) {

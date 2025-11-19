@@ -1,21 +1,77 @@
 "use client";
 
-import {
-  RiUserLine,
-  RiRocketLine,
-  RiCodeLine,
-  RiSettingsLine,
-} from "react-icons/ri";
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import { RiAddLine } from "react-icons/ri";
 import { useUser } from "@/hooks/useUser";
-import { Card, Row, Col, Avatar, Typography, Space, Spin } from "antd";
-import Button from "@/components/ui/Button";
+import { useDevices } from "@/hooks/useDevices";
+import { Typography, Space, Spin, Button } from "antd";
+import DeviceModal from "@/components/devices/DeviceModal";
 
-const { Title, Paragraph, Text } = Typography;
+const { Paragraph } = Typography;
+
+// Dynamically import TrackerMap to avoid SSR issues with Leaflet
+const DynamicTrackerMap = dynamic(() => import("@/components/map/TrackerMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <Spin size="large" />
+    </div>
+  ),
+});
 
 export default function PrivatePage() {
-  const { data: user, loading } = useUser({ redirectToLogin: true });
+  const { data: user, loading: userLoading } = useUser({
+    redirectToLogin: true,
+  });
+  const {
+    data: devices,
+    loading: devicesLoading,
+    refetch: refetchDevices,
+  } = useDevices();
+  const [positions, setPositions] = useState([]);
+  const [loadingPositions, setLoadingPositions] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  if (loading || !user) {
+  // Fetch positions for devices
+  useEffect(() => {
+    const fetchPositions = async () => {
+      if (!devices || devices.length === 0) {
+        setPositions([]);
+        return;
+      }
+
+      try {
+        setLoadingPositions(true);
+        // Use server-side proxy API route
+        const response = await fetch("/api/traccar/positions", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const positionsData = await response.json();
+        setPositions(positionsData || []);
+      } catch (err) {
+        console.error("Error fetching positions:", err);
+        setPositions([]);
+      } finally {
+        setLoadingPositions(false);
+      }
+    };
+
+    fetchPositions();
+  }, [devices]);
+
+  const handleModalSuccess = () => {
+    refetchDevices();
+    setModalOpen(false);
+  };
+
+  if (userLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Space direction="vertical" align="center" size="large">
@@ -26,82 +82,53 @@ export default function PrivatePage() {
     );
   }
 
+  const hasDevices = devices && devices.length > 0;
+  const isLoading = devicesLoading || loadingPositions;
+
   return (
-    <div>
-      <Space direction="vertical" size="large" className="w-full">
-        <div className="text-center">
-          <Title level={1}>¡Bienvenido a tu proyecto!</Title>
-          <Paragraph className="text-lg text-gray-600">
-            Esta es una página protegida que demuestra la funcionalidad de
-            autenticación
-          </Paragraph>
+    <div className="w-full h-[calc(100vh-200px)] relative -m-6">
+      {isLoading ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <Space direction="vertical" align="center" size="large">
+            <Spin size="large" />
+            <Paragraph className="text-gray-600">Cargando mapa...</Paragraph>
+          </Space>
         </div>
-
-        <Row gutter={[24, 24]}>
-          <Col xs={24} md={12}>
-            <Card title="Información del Usuario">
-              <Space direction="vertical" size="middle" className="w-full">
-                <Space size="middle">
-                  <Avatar
-                    icon={<RiUserLine />}
-                    size="large"
-                    style={{ backgroundColor: "#2563eb" }}
-                  />
-                  <div>
-                    <Text strong>Email:</Text>
-                    <br />
-                    <Text>{user?.email || "N/A"}</Text>
-                  </div>
-                </Space>
-                <Space size="middle">
-                  <RiRocketLine className="text-xl text-green-600" />
-                  <div>
-                    <Text strong>Miembro desde:</Text>
-                    <br />
-                    <Text>
-                      {user?.created_at
-                        ? new Date(user.created_at).toLocaleDateString("es-ES")
-                        : "N/A"}
-                    </Text>
-                  </div>
-                </Space>
-              </Space>
-            </Card>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Card title="Acciones Rápidas">
-              <Space direction="vertical" className="w-full" size="small">
-                <Button
-                  type="primary"
-                  icon={<RiRocketLine />}
-                  className="w-full"
-                  size="large"
-                >
-                  Crear Nuevo Proyecto
-                </Button>
-                <Button icon={<RiCodeLine />} className="w-full" size="large">
-                  Ver Código Fuente
-                </Button>
-                <Button
-                  icon={<RiSettingsLine />}
-                  className="w-full"
-                  size="large"
-                >
-                  Configuración
-                </Button>
-              </Space>
-            </Card>
-          </Col>
-        </Row>
-
-        <div className="text-center">
-          <Text type="secondary">
-            Esta página demuestra que la autenticación está funcionando
-            correctamente
-          </Text>
-        </div>
-      </Space>
+      ) : (
+        <>
+          <DynamicTrackerMap
+            devices={devices || []}
+            positions={positions}
+            center={hasDevices ? [40.4168, -3.7038] : [0, 0]}
+            zoom={hasDevices ? 6 : 2}
+          />
+          {!hasDevices && (
+            <div className="absolute bottom-4 right-4 z-[1000]">
+              <Button
+                type="primary"
+                size="large"
+                icon={<RiAddLine />}
+                onClick={() => setModalOpen(true)}
+                className="shadow-lg"
+                style={{
+                  fontSize: "20px",
+                  height: "64px",
+                  minWidth: "120px",
+                  padding: "0 24px",
+                }}
+              >
+                Crear
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+      <DeviceModal
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onSuccess={handleModalSuccess}
+        device={null}
+      />
     </div>
   );
 }

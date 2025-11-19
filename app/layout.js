@@ -1,5 +1,6 @@
 import "./globals.css";
 import "antd/dist/reset.css";
+import "leaflet/dist/leaflet.css";
 import AntdProvider from "@/components/providers/AntdProvider";
 
 export const metadata = {
